@@ -27,7 +27,7 @@ const userSchema = new mongoose.Schema({
 		type: Boolean,
 		default: false,
 	},
-	freindRequests: [
+	friendRequests: [
 		{
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",

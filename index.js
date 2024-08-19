@@ -10,6 +10,8 @@ const app = express();
 require("dotenv").config();
 
 const UserRoutes = require("./routes/UserRoutes");
+const AuthRoutes = require("./routes/AuthRoutes");
+const { authMiddleware } = require("./middleware/authMiddleware");
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -30,4 +32,5 @@ const listener = app.listen(process.env.PORT || 8000, () => {
 	console.log("Your app is listening on port " + listener.address().port);
 });
 
-app.use("/api/user", UserRoutes);
+app.use("/api/auth", AuthRoutes);
+app.use("/api/user", authMiddleware, UserRoutes);
