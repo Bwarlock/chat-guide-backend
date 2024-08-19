@@ -9,6 +9,8 @@ const jwt = require("jsonwebtoken");
 const app = express();
 require("dotenv").config();
 
+const UserRoutes = require("./routes/UserRoutes");
+
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -16,13 +18,16 @@ app.use(passport.initialize());
 
 mongoose
 	.connect(process.env.MONGODB_URI, {
-		useUnifiedTopology: true,
-		useNewUrlParser: true,
-		createIndexes: true,
+		dbName: process.env.DB_NAME,
+		// useUnifiedTopology: true,
+		// useNewUrlParser: true,
+		// createIndexes: true,
 	})
 	.then(() => console.log("Connected to MongoDB"))
 	.catch((err) => console.log("Could not connect to MongoDB", err));
 
-const listener = app.listen(process.env.PORT || 3000, () => {
+const listener = app.listen(process.env.PORT || 8000, () => {
 	console.log("Your app is listening on port " + listener.address().port);
 });
+
+app.use("/api/user", UserRoutes);
