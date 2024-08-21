@@ -11,6 +11,7 @@ require("dotenv").config();
 
 const UserRoutes = require("./routes/UserRoutes");
 const AuthRoutes = require("./routes/AuthRoutes");
+const MessageRoutes = require("./routes/MessageRoutes");
 const { authMiddleware } = require("./middleware/authMiddleware");
 
 app.use(cors());
@@ -34,3 +35,4 @@ const listener = app.listen(process.env.PORT || 8000, () => {
 
 app.use("/api/auth", AuthRoutes);
 app.use("/api/user", authMiddleware, UserRoutes);
+app.use("/api/message", authMiddleware, MessageRoutes);

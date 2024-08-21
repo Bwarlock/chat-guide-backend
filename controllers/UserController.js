@@ -2,11 +2,36 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/UserModel");
 
+exports.user = async (req, res) => {
+	try {
+		const { id } = req.params;
+		if (
+			id != req.user._id &&
+			!req.user.friends.some((friendId) => friendId == id)
+		) {
+			return res.status(403).json({ message: "Unauthorized Access" });
+		}
+
+		const user = await User.findById(id).lean();
+
+		return res.status(200).json({ user: user });
+	} catch (error) {
+		console.log(error);
+		return res.status(500).json({ error: error, message: error?.message });
+	}
+};
+
 exports.users = async (req, res) => {
 	try {
 		const users = await User.find({
-			_id: { $nin: [...req.user.friends, req.user._id] },
-		});
+			_id: {
+				$nin: [
+					...req.user.friends,
+					...req.user.sentFriendRequests,
+					req.user._id,
+				],
+			},
+		}).lean();
 
 		res.status(200).json({ message: "Users Retrieved", users: users });
 	} catch (error) {
@@ -20,7 +45,7 @@ exports.friends = async (req, res) => {
 		const user = await User.findById(req.user._id)
 			.populate("friends", "name email image")
 			.lean();
-		console.log(user);
+
 		return res.status(200).json({ friends: user.friends });
 	} catch (error) {
 		console.log(error);
@@ -43,9 +68,13 @@ exports.getFriendRequest = async (req, res) => {
 		//fetch the user document based on the User id
 		const user = await User.findById(req.user._id)
 			.populate("friendRequests", "name email image")
+			.populate("sentFriendRequests", "name email image")
 			.lean();
-		console.log(user);
-		return res.status(200).json({ friendRequests: user.friendRequests });
+
+		return res.status(200).json({
+			friendRequests: user.friendRequests,
+			sentFriendRequests: user.sentFriendRequests,
+		});
 	} catch (error) {
 		console.log(error);
 		return res.status(500).json({ error: error, message: error?.message });
@@ -74,34 +103,50 @@ exports.sendFriendRequest = async (req, res) => {
 	}
 };
 
+exports.cancelFriendRequest = async (req, res) => {
+	try {
+		const { id } = req.body;
+		const senderUserId = req.user._id;
+		console.log(id, senderUserId);
+		//update the recepient's friendRequestsArray!
+
+		await User.findByIdAndUpdate(id, {
+			$pull: { friendRequests: senderUserId },
+		});
+		await User.findByIdAndUpdate(senderUserId, {
+			$pull: { sentFriendRequests: id },
+		});
+
+		return res.status(200).json({ message: "Friend Request Cancelled" });
+	} catch (error) {
+		console.log(error);
+		return res.status(500).json({ error: error, message: error?.message });
+	}
+};
+
 exports.acceptFriendRequest = async (req, res) => {
 	try {
 		const { id } = req.body;
-		const recepientId = req.user._id;
+		const recipientId = req.user._id;
 
-		//retrieve the documents of sender and the recipient
-		const sender = await User.findById(id);
-		const recepient = await User.findById(recepientId);
+		// Remove friend requests using $pull
+		await User.findByIdAndUpdate(recipientId, {
+			$pull: {
+				friendRequests: id,
+				sentFriendRequests: id,
+			},
+		});
 
-		sender.friends.push(recepientId);
-		recepient.friends.push(id);
+		await User.findByIdAndUpdate(id, {
+			$pull: {
+				friendRequests: recipientId,
+				sentFriendRequests: recipientId,
+			},
+		});
 
-		recepient.friendRequests = recepient.friendRequests.filter(
-			(request) => request.toString() !== id.toString()
-		);
-		recepient.sentFriendRequests = sender.sentFriendRequests.filter(
-			(request) => request.toString() !== id.toString()
-		);
-
-		sender.sentFriendRequests = sender.sentFriendRequests.filter(
-			(request) => request.toString() !== recepientId.toString()
-		);
-		sender.friendRequests = recepient.friendRequests.filter(
-			(request) => request.toString() !== recepientId.toString()
-		);
-
-		await sender.save();
-		await recepient.save();
+		// Add each other to friends list using $addToSet to prevent duplicates
+		await User.findByIdAndUpdate(id, { $addToSet: { friends: recipientId } });
+		await User.findByIdAndUpdate(recipientId, { $addToSet: { friends: id } });
 
 		return res.status(200).json({ message: "Friend Request accepted" });
 	} catch (error) {
