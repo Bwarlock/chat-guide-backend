@@ -51,15 +51,16 @@ messageSocket(msgSocket);
 // 	console.log("sdsadasdiia");
 // });
 
-app.use("/", (req, res) => {
-	return res.status(200).json({ status: "working" });
-});
 app.use("/ping", (req, res) => {
 	return res.status(200).json({ status: "pong" });
 });
 app.use("/api/auth", AuthRoutes);
 app.use("/api/user", authMiddleware, UserRoutes);
 app.use("/api/message", authMiddleware, MessageRoutes);
+
+app.all("*", (req, res, next) => {
+	res.status(404).send("Not Found");
+});
 
 const listener = server.listen(process.env.PORT || 8000, () => {
 	console.log("Your app is listening on port " + listener.address().port);

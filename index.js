@@ -50,9 +50,7 @@ messageSocket(msgSocket);
 // msgSocket.on("ping", (socket) => {
 // 	console.log("sdsadasdiia");
 // });
-app.use("/", (req, res) => {
-	return res.status(200).json({ status: "working" });
-});
+
 app.use("/ping", (req, res) => {
 	return res.status(200).json({ status: "pong" });
 });
