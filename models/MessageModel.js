@@ -9,10 +9,16 @@ const messageSchema = new mongoose.Schema(
 		recipientId: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
+			index: true,
 		},
 		messageType: {
 			type: String,
 			enum: ["text", "image"],
+		},
+		delivered: {
+			type: Boolean,
+			default: false,
+			index: true,
 		},
 		message: String,
 		imageUrl: String,

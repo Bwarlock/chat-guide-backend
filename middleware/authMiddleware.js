@@ -17,3 +17,22 @@ exports.authMiddleware = async (req, res, next) => {
 		return res.status(401).json({ message: "Please authenticate" });
 	}
 };
+
+exports.socketAuthMiddleware = async (socket, next) => {
+	try {
+		console.log("hiiiii socket auth");
+		const token = socket.handshake.auth.token;
+		const decoded = jwt.verify(token, process.env.JWT_SECRET);
+		const user = await User.findOne({ _id: decoded.id });
+
+		if (!user) {
+			throw new Error("Please authenticate");
+		}
+		socket.user = user;
+		next();
+	} catch (error) {
+		console.log(error);
+		socket.emit("error", { message: error.message });
+		socket.disconnect();
+	}
+};

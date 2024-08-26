@@ -6,13 +6,21 @@ const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
 const jwt = require("jsonwebtoken");
 
+const http = require("http");
+const { Server } = require("socket.io");
+const MessageSocket = require("./controllers/MessageSocket");
+
 const app = express();
 require("dotenv").config();
 
 const UserRoutes = require("./routes/UserRoutes");
 const AuthRoutes = require("./routes/AuthRoutes");
 const MessageRoutes = require("./routes/MessageRoutes");
-const { authMiddleware } = require("./middleware/authMiddleware");
+const {
+	authMiddleware,
+	socketAuthMiddleware,
+} = require("./middleware/authMiddleware");
+const { messageSocket } = require("./controllers/MessageController");
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -29,10 +37,24 @@ mongoose
 	.then(() => console.log("Connected to MongoDB"))
 	.catch((err) => console.log("Could not connect to MongoDB", err));
 
-const listener = app.listen(process.env.PORT || 8000, () => {
-	console.log("Your app is listening on port " + listener.address().port);
-});
+const server = http.createServer(app);
+const msgSocket = MessageSocket.init(server);
+// const msgSocket = new Server(server);
+// console.log(msgSocket);
+msgSocket.use(socketAuthMiddleware);
+messageSocket(msgSocket);
+// msgSocket.on("connection", (socket) => {
+
+// 	console.log("sdiia",socket);
+// });
+// msgSocket.on("ping", (socket) => {
+// 	console.log("sdsadasdiia");
+// });
 
 app.use("/api/auth", AuthRoutes);
 app.use("/api/user", authMiddleware, UserRoutes);
 app.use("/api/message", authMiddleware, MessageRoutes);
+
+const listener = server.listen(process.env.PORT || 8000, () => {
+	console.log("Your app is listening on port " + listener.address().port);
+});

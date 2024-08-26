@@ -12,7 +12,7 @@ exports.user = async (req, res) => {
 			return res.status(403).json({ message: "Unauthorized Access" });
 		}
 
-		const user = await User.findById(id).lean();
+		const user = await User.findById(id ? id : req.user._id).lean();
 
 		return res.status(200).json({ user: user });
 	} catch (error) {

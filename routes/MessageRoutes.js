@@ -4,7 +4,7 @@ const MessageController = require("../controllers/MessageController");
 
 router.post("/create-message", MessageController.createMessage);
 router.get("/get-messages", MessageController.getMessages);
-router.delete("/delete-message-queue", MessageController.deleteMessageQueue);
+router.post("/received-messages", MessageController.receivedMessages);
 router.get("/restore-messages", MessageController.restoreMessages);
 
 module.exports = router;
