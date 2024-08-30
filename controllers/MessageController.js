@@ -4,6 +4,9 @@ const User = require("../models/UserModel");
 const Message = require("../models/MessageModel");
 
 const mongoose = require("mongoose");
+const Image = require("../models/ImageModel");
+const formidable = require("formidable");
+const fs = require("fs");
 const connectedUsers = {};
 
 // async function syncMessages(user, message) {
@@ -13,33 +16,90 @@ const connectedUsers = {};
 // 		$push: { messageQueue: message._id },
 // 	});
 // }
-
-exports.createMessage = async (req, res) => {
+exports.getImage = async (req, res) => {
 	try {
-		const MessageSocket = require("./MessageSocket");
-		const msgSocket = MessageSocket.getSocket();
-
-		const data = req.body;
-		const message = await Message.create(data);
-		await message.save();
-		const recipientId = message.recipientId.toString();
-		console.log(
-			"my socket",
-			message.recipientId.toString(),
-			JSON.stringify(message),
-			connectedUsers[recipientId]
-			// connectedUsers[jsonMessage.recipientId].id
-		);
-		if (connectedUsers[recipientId] && connectedUsers[recipientId].id) {
-			const id = connectedUsers[recipientId].id;
-			msgSocket.to(id).emit("receiveMessage", message);
+		const { id } = req.params;
+		const message = await Message.findById(id).populate("image", "imageBase64");
+		console.log(message.recipientId, req.user._id, message.senderId);
+		if (
+			(message.recipientId.toString() == req.user._id.toString() ||
+				message.senderId.toString() == req.user._id.toString()) &&
+			message.image.imageBase64
+		) {
+			return res.status(200).send(message.image.imageBase64);
+		} else {
+			throw new Error("Unauthorized or Missing Resource");
 		}
-
-		return res.status(200).json({ chatMessage: message });
 	} catch (error) {
 		console.log(error);
 		return res.status(500).json({ error: error, message: error?.message });
 	}
+};
+
+exports.createMessage = async (req, res) => {
+	const form = new formidable.IncomingForm();
+	console.log("hi creating");
+	form.parse(req, async (error, fields, files) => {
+		if (error) {
+			console.log(error);
+			return res.status(500).json({ error: error, message: error?.message });
+		}
+		try {
+			const MessageSocket = require("./MessageSocket");
+			const msgSocket = MessageSocket.getSocket();
+
+			const { senderId, recipientId, messageType, message, imageUrl } = fields;
+			const data = {
+				senderId: senderId[0],
+				recipientId: recipientId[0],
+				messageType: messageType[0],
+				message: message[0],
+				imageUrl: imageUrl[0],
+			};
+
+			const imageFile = files.image ? files.image[0] : null;
+			let imageId = null;
+
+			if (data.messageType == "image" && imageFile) {
+				if (imageFile.size > 10 * 1024 * 1024) {
+					return res
+						.status(400)
+						.json({ message: "File size exceeds the 10 MB limit." });
+				}
+				console.log(imageFile);
+				const imageBase64 = fs.readFileSync(imageFile.filepath, {
+					encoding: "base64",
+				});
+				const newImage = await Image.create({
+					fileName: imageFile.originalFilename,
+					fileSize: imageFile.size,
+					mimeType: imageFile.mimetype,
+					imageBase64: imageBase64,
+				});
+				await newImage.save();
+				imageId = newImage._id;
+			}
+
+			if (imageId) {
+				data.image = imageId;
+			}
+
+			// console.log(data, imageFile);
+
+			const newMessage = await Message.create(data);
+			await newMessage.save();
+			const reciId = newMessage.recipientId.toString();
+			if (connectedUsers[reciId] && connectedUsers[reciId].id) {
+				const id = connectedUsers[reciId].id;
+				msgSocket.to(id).emit("receiveMessage", newMessage);
+			}
+
+			return res.status(200).json({ chatMessage: newMessage });
+		} catch (error) {
+			console.log(error);
+			return res.status(500).json({ error: error, message: error?.message });
+		}
+	});
 };
 
 exports.getMessages = async (req, res) => {

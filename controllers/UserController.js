@@ -4,15 +4,7 @@ const User = require("../models/UserModel");
 
 exports.user = async (req, res) => {
 	try {
-		const { id } = req.params;
-		if (
-			id != req.user._id &&
-			!req.user.friends.some((friendId) => friendId == id)
-		) {
-			return res.status(403).json({ message: "Unauthorized Access" });
-		}
-
-		const user = await User.findById(id ? id : req.user._id).lean();
+		const user = await User.findById(req.user._id).lean();
 
 		return res.status(200).json({ user: user });
 	} catch (error) {
@@ -31,6 +23,7 @@ exports.users = async (req, res) => {
 					req.user._id,
 				],
 			},
+			private: false,
 		}).lean();
 
 		res.status(200).json({ message: "Users Retrieved", users: users });
@@ -43,7 +36,7 @@ exports.users = async (req, res) => {
 exports.friends = async (req, res) => {
 	try {
 		const user = await User.findById(req.user._id)
-			.populate("friends", "name email image")
+			.populate("friends", "name email image username")
 			.lean();
 
 		return res.status(200).json({ friends: user.friends });
@@ -54,7 +47,21 @@ exports.friends = async (req, res) => {
 };
 exports.findUsers = async (req, res) => {
 	try {
-		const users = await User.find({ _id: { $ne: req.user._id } });
+		const { searchQuery } = req.query;
+		const users = await User.find({
+			_id: {
+				$nin: [
+					...req.user.friends,
+					...req.user.sentFriendRequests,
+					req.user._id,
+				],
+			},
+			$or: [
+				{ name: { $regex: searchQuery, $options: "i" } },
+				{ username: { $regex: searchQuery, $options: "i" } },
+				{ email: { $regex: searchQuery, $options: "i" } },
+			],
+		});
 
 		res.status(200).json({ message: "Users Found", users: users });
 	} catch (error) {
@@ -149,6 +156,21 @@ exports.acceptFriendRequest = async (req, res) => {
 		await User.findByIdAndUpdate(recipientId, { $addToSet: { friends: id } });
 
 		return res.status(200).json({ message: "Friend Request accepted" });
+	} catch (error) {
+		console.log(error);
+		return res.status(500).json({ error: error, message: error?.message });
+	}
+};
+
+exports.private = async (req, res) => {
+	try {
+		const { private } = req.body;
+		console.log(private);
+		await User.findByIdAndUpdate(req.user._id, {
+			private: private ?? req.user.private,
+		});
+
+		return res.status(200).json({ message: "Private Preference Changed" });
 	} catch (error) {
 		console.log(error);
 		return res.status(500).json({ error: error, message: error?.message });

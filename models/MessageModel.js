@@ -22,6 +22,10 @@ const messageSchema = new mongoose.Schema(
 		},
 		message: String,
 		imageUrl: String,
+		image: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "Image",
+		},
 	},
 	{ timestamps: true }
 );
